@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  inbound-mcp:
+    build: .
+    container_name: inbound-mcp-server
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount browser profile directories
+      - ./contexts:/app/contexts
+      # Mount app for development (optional - comment out for production)
+      - ./app:/app/app
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
