@@ -168,10 +168,49 @@ def ensure_logged_in(nova):
             
             print("✅ Login successful! Session saved to profile.\n")
             time.sleep(3)  # Wait for dashboard to fully load
+            
+            # Take screenshot after successful login
+            try:
+                from datetime import datetime
+                from pathlib import Path
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                
+                # Save to a directory that's easy to find
+                # On Render, save to /tmp (accessible via shell)
+                # Locally, save to current directory
+                if Path("/app").exists():
+                    screenshot_path = f"/tmp/login_success_{timestamp}.png"
+                else:
+                    screenshot_path = f"./login_success_{timestamp}.png"
+                
+                nova.page.screenshot(path=screenshot_path, full_page=True)
+                print(f"📸 Screenshot saved: {screenshot_path}")
+                print(f"   This screenshot shows the successful login to Arcadia dashboard\n")
+            except Exception as screenshot_error:
+                print(f"⚠️  Could not take screenshot: {screenshot_error}\n")
+            
             return True
             
         except Exception as login_error:
             print(f"❌ Login failed: {login_error}")
+            
+            # Take screenshot of failed login attempt
+            try:
+                from datetime import datetime
+                from pathlib import Path
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                
+                if Path("/app").exists():
+                    screenshot_path = f"/tmp/login_failed_{timestamp}.png"
+                else:
+                    screenshot_path = f"./login_failed_{timestamp}.png"
+                
+                nova.page.screenshot(path=screenshot_path, full_page=True)
+                print(f"📸 Failed login screenshot saved: {screenshot_path}")
+                print(f"   This screenshot shows the page state when login failed\n")
+            except Exception as screenshot_error:
+                print(f"⚠️  Could not take failed login screenshot: {screenshot_error}\n")
+            
             raise Exception(f"Auto-login failed: {login_error}")
 
 
@@ -340,6 +379,24 @@ def run_arcadia_order(master_bill, product_code, quantity, temperature="FREEZER"
                 print(f"⚠️  Could not fill Header Remarks: {e}\n")
         else:
             print("⊘ Comments not provided, skipping\n")
+        
+        # Take screenshot before submitting (form fully filled)
+        print("📸 Taking screenshot of filled form...")
+        try:
+            from datetime import datetime
+            from pathlib import Path
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            if Path("/app").exists():
+                screenshot_path = f"/tmp/form_filled_{timestamp}_{master_bill}.png"
+            else:
+                screenshot_path = f"./form_filled_{timestamp}_{master_bill}.png"
+            
+            nova.page.screenshot(path=screenshot_path, full_page=True)
+            print(f"✅ Pre-submit screenshot saved: {screenshot_path}")
+            print(f"   This shows the completed form before submission\n")
+        except Exception as screenshot_error:
+            print(f"⚠️  Could not take pre-submit screenshot: {screenshot_error}\n")
         
         # Submit form
         print("→ Submitting order form...")

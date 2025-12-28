@@ -12,7 +12,7 @@ NO business logic should exist here.
 
 from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from sse_starlette.sse import EventSourceResponse
 from pydantic import BaseModel
 from typing import Any, Dict, Optional, List
@@ -20,6 +20,7 @@ import traceback
 import asyncio
 import json
 import os
+import glob
 from concurrent.futures import ThreadPoolExecutor
 import sys
 from pathlib import Path
@@ -526,6 +527,213 @@ async def handle_mcp_request(body: dict) -> dict:
 
 
 # Removed duplicate /mcp endpoint - using the main one at line 145
+
+
+# ============================================================================
+# SCREENSHOT ENDPOINTS
+# ============================================================================
+
+@app.get("/screenshots")
+async def list_screenshots():
+    """
+    List all available screenshots (login success, login failed, and pre-submit forms).
+    
+    Returns a list of screenshot filenames sorted by timestamp (newest first).
+    """
+    try:
+        # Look for screenshots in /tmp (Render) or current directory (local)
+        screenshot_dir = "/tmp" if Path("/app").exists() else "."
+        
+        # Get all screenshot types
+        login_success = glob.glob(f"{screenshot_dir}/login_success_*.png")
+        login_failed = glob.glob(f"{screenshot_dir}/login_failed_*.png")
+        forms_filled = glob.glob(f"{screenshot_dir}/form_filled_*.png")
+        
+        all_screenshots = login_success + login_failed + forms_filled
+        all_screenshots.sort(reverse=True)  # Most recent first
+        
+        # Extract just the filenames
+        screenshot_names = [Path(s).name for s in all_screenshots]
+        
+        return {
+            "success": True,
+            "screenshots": screenshot_names,
+            "count": len(screenshot_names),
+            "by_type": {
+                "login_success": [Path(s).name for s in sorted(login_success, reverse=True)],
+                "login_failed": [Path(s).name for s in sorted(login_failed, reverse=True)],
+                "forms_filled": [Path(s).name for s in sorted(forms_filled, reverse=True)]
+            },
+            "directory": screenshot_dir,
+            "note": "Screenshots show login attempts and completed order forms before submission"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list screenshots: {str(e)}"
+        )
+
+
+@app.get("/screenshots/{filename}")
+async def get_screenshot(filename: str):
+    """
+    Download a specific screenshot by filename.
+    
+    Supported types:
+    - login_success_YYYYMMDD_HHMMSS.png
+    - login_failed_YYYYMMDD_HHMMSS.png
+    - form_filled_YYYYMMDD_HHMMSS_MASTERBILL.png
+    
+    Args:
+        filename: Name of the screenshot file
+    
+    Returns:
+        The PNG image file
+    """
+    try:
+        # Security: Only allow specific patterns to prevent directory traversal
+        valid_prefixes = ["login_success_", "login_failed_", "form_filled_"]
+        if not any(filename.startswith(prefix) for prefix in valid_prefixes) or not filename.endswith(".png"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid filename format. Expected: login_success_*.png, login_failed_*.png, or form_filled_*.png"
+            )
+        
+        # Determine screenshot directory
+        screenshot_dir = "/tmp" if Path("/app").exists() else "."
+        file_path = Path(screenshot_dir) / filename
+        
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Screenshot not found: {filename}"
+            )
+        
+        return FileResponse(
+            path=str(file_path),
+            media_type="image/png",
+            filename=filename
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve screenshot: {str(e)}"
+        )
+
+
+@app.get("/screenshots/latest/download")
+async def get_latest_screenshot():
+    """
+    Download the most recent screenshot (any type).
+    
+    Convenient endpoint to always get the latest screenshot without knowing the filename.
+    """
+    try:
+        # Find all screenshots
+        screenshot_dir = "/tmp" if Path("/app").exists() else "."
+        patterns = [
+            f"{screenshot_dir}/login_success_*.png",
+            f"{screenshot_dir}/login_failed_*.png",
+            f"{screenshot_dir}/form_filled_*.png"
+        ]
+        
+        all_screenshots = []
+        for pattern in patterns:
+            all_screenshots.extend(glob.glob(pattern))
+        
+        if not all_screenshots:
+            raise HTTPException(
+                status_code=404,
+                detail="No screenshots found. No activity has occurred yet."
+            )
+        
+        # Get most recent
+        all_screenshots.sort(reverse=True)
+        latest_screenshot = Path(all_screenshots[0])
+        
+        return FileResponse(
+            path=str(latest_screenshot),
+            media_type="image/png",
+            filename=latest_screenshot.name
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve latest screenshot: {str(e)}"
+        )
+
+
+@app.get("/screenshots/latest/login")
+async def get_latest_login_screenshot():
+    """
+    Download the most recent login screenshot (success or failed).
+    """
+    try:
+        screenshot_dir = "/tmp" if Path("/app").exists() else "."
+        login_screenshots = []
+        login_screenshots.extend(glob.glob(f"{screenshot_dir}/login_success_*.png"))
+        login_screenshots.extend(glob.glob(f"{screenshot_dir}/login_failed_*.png"))
+        
+        if not login_screenshots:
+            raise HTTPException(
+                status_code=404,
+                detail="No login screenshots found."
+            )
+        
+        login_screenshots.sort(reverse=True)
+        latest = Path(login_screenshots[0])
+        
+        return FileResponse(
+            path=str(latest),
+            media_type="image/png",
+            filename=latest.name
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve latest login screenshot: {str(e)}"
+        )
+
+
+@app.get("/screenshots/latest/form")
+async def get_latest_form_screenshot():
+    """
+    Download the most recent pre-submit form screenshot.
+    """
+    try:
+        screenshot_dir = "/tmp" if Path("/app").exists() else "."
+        form_screenshots = glob.glob(f"{screenshot_dir}/form_filled_*.png")
+        
+        if not form_screenshots:
+            raise HTTPException(
+                status_code=404,
+                detail="No form screenshots found. No orders have been created yet."
+            )
+        
+        form_screenshots.sort(reverse=True)
+        latest = Path(form_screenshots[0])
+        
+        return FileResponse(
+            path=str(latest),
+            media_type="image/png",
+            filename=latest.name
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve latest form screenshot: {str(e)}"
+        )
+
+
+# ============================================================================
 
 
 if __name__ == "__main__":

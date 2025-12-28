@@ -205,10 +205,22 @@ def create_single_arcadia_order(order_input: CreateOrderInput) -> OrderResult:
     print("=" * 80)
     print("🏢 CREATING ARCADIA INBOUND ORDER")
     print("=" * 80)
-    print("🔄 Running Arcadia order creation as subprocess...\n")
     
-    # Path to the Arcadia order script (now inside inbound_mcp/scripts/)
-    script_path = Path(__file__).parent.parent / "scripts" / "run_arcadia_only.py"
+    # Auto-detect environment or use explicit flag
+    # If on Render (has /app directory), always use NovaAct
+    # If local and user wants to see browser, use local Playwright
+    is_render = Path("/app").exists()
+    use_local = order_input.use_local_browser and not is_render
+    
+    if is_render:
+        print("☁️  Running on RENDER → Using NovaAct (cloud browser)...\n")
+        script_path = Path(__file__).parent.parent / "scripts" / "run_arcadia_only.py"
+    elif use_local:
+        print("🖥️  Running LOCALLY → Using Playwright (visible browser)...\n")
+        script_path = Path(__file__).parent.parent / "scripts" / "run_arcadia_local.py"
+    else:
+        print("☁️  Using NovaAct (cloud browser)...\n")
+        script_path = Path(__file__).parent.parent / "scripts" / "run_arcadia_only.py"
     
     if not script_path.exists():
         raise ScriptExecutionError(f"Arcadia script not found: {script_path}")
