@@ -442,29 +442,13 @@ async def root(request: Request):
     }
 
 
-# Root endpoint - POST for MCP (Omni compatibility)
+# Root endpoint - POST for MCP (Plain HTTP JSON-RPC)
 @app.post("/")
 async def root_mcp(request: Request):
-    """Root endpoint also accepts MCP JSON-RPC for Omni compatibility"""
-    accept_header = request.headers.get("accept", "")
-    print(f"[DEBUG] Root POST - Accept header: '{accept_header}'")
-    print(f"[DEBUG] Root POST - All headers: {dict(request.headers)}")
+    """Root endpoint accepts MCP JSON-RPC - returns plain JSON (no SSE)"""
+    print(f"[DEBUG] Root POST - Headers: {dict(request.headers)}")
     
-    # Omni's SSE client doesn't send Accept header, so check Content-Type and body
-    try:
-        body = await request.body()
-        body_text = body.decode('utf-8')
-        print(f"[DEBUG] Request body preview: {body_text[:200]}")
-        
-        # If it's a JSON-RPC request, return SSE format for Omni compatibility
-        if '"jsonrpc"' in body_text and '"method"' in body_text:
-            print("[DEBUG] Detected JSON-RPC request - using SSE response")
-            # Parse body and return SSE
-            body_json = json.loads(body_text)
-            return await sse_endpoint_with_body(body_json)
-    except Exception as e:
-        print(f"[DEBUG] Error parsing body: {e}")
-    
+    # Forward directly to MCP endpoint (plain JSON response)
     return await mcp_endpoint(request)
 
 
@@ -539,15 +523,7 @@ async def handle_mcp_request(body: dict) -> dict:
         }
 
 
-# MCP POST handler with SSE support
-@app.post("/mcp")
-async def mcp_post_handler(request: Request):
-    """MCP endpoint that supports both JSON and SSE"""
-    # Check if client wants SSE
-    accept_header = request.headers.get("accept", "")
-    if "text/event-stream" in accept_header:
-        return await sse_endpoint(request)
-    return await mcp_endpoint(request)
+# Removed duplicate /mcp endpoint - using the main one at line 145
 
 
 if __name__ == "__main__":
