@@ -40,9 +40,20 @@ ENV/
 NOVA_ACT_API_KEY
 MCP_SECRET
 
-# Browser Profiles (NovaAct)
+# Browser automation profiles (HIGHLY SENSITIVE)
 contexts/
+arcadia_profile/
+**/arcadia_profile/
+**/chrome-profile/
+**/user-data-dir/
 *.profile/
+
+# Chrome / Chromium auth artifacts
+**/Cookies
+**/Login Data
+**/Local Storage
+**/Web Data
+**/Preferences
 
 # IDE
 .vscode/
