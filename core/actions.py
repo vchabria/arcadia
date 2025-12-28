@@ -207,8 +207,8 @@ def create_single_arcadia_order(order_input: CreateOrderInput) -> OrderResult:
     print("=" * 80)
     print("🔄 Running Arcadia order creation as subprocess...\n")
     
-    # Path to the Arcadia order script
-    script_path = Path(__file__).parent.parent.parent / "stagehand-test" / "run_arcadia_only.py"
+    # Path to the Arcadia order script (now inside inbound_mcp/scripts/)
+    script_path = Path(__file__).parent.parent / "scripts" / "run_arcadia_only.py"
     
     if not script_path.exists():
         raise ScriptExecutionError(f"Arcadia script not found: {script_path}")
@@ -242,9 +242,16 @@ def create_single_arcadia_order(order_input: CreateOrderInput) -> OrderResult:
         
         env['NOVA_ACT_API_KEY'] = api_key
         
-        # Get Python command (prefer venv Python for NovaAct)
-        venv_python = Path(__file__).parent.parent.parent / "stagehand-test" / "nova-act-env" / "bin" / "python"
-        python_cmd = str(venv_python) if venv_python.exists() else _get_python_command()
+        # Pass Arcadia credentials for auto-login (if set)
+        arcadia_username = os.getenv('ARCADIA_USERNAME')
+        arcadia_password = os.getenv('ARCADIA_PASSWORD')
+        if arcadia_username:
+            env['ARCADIA_USERNAME'] = arcadia_username
+        if arcadia_password:
+            env['ARCADIA_PASSWORD'] = arcadia_password
+        
+        # Get Python command - use system Python in production
+        python_cmd = _get_python_command()
         
         # Prepare command with all arguments
         cmd_args = [python_cmd, str(script_path), master_bill, product_code, str(quantity), temperature]
