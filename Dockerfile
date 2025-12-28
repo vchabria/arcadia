@@ -5,7 +5,7 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for Playwright + VNC
+# Install system dependencies for Playwright
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -29,11 +29,6 @@ RUN apt-get update && apt-get install -y \
     libxkbcommon0 \
     libxrandr2 \
     xdg-utils \
-    xvfb \
-    x11vnc \
-    fluxbox \
-    novnc \
-    websockify \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -54,21 +49,13 @@ RUN mkdir -p /app/contexts
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PORT=10000
-ENV DISPLAY=:99
-ENV VNC_PORT=5900
-ENV NOVNC_PORT=6080
 
-# Expose ports (MCP server + VNC)
-EXPOSE 10000 5900 6080
+# Expose port (Render will set the PORT env var)
+EXPOSE 10000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:10000/health')"
 
-# Copy startup scripts
-COPY start_with_vnc.sh /app/start_with_vnc.sh
-COPY start_vnc.sh /app/start_vnc.sh
-RUN chmod +x /app/start_with_vnc.sh /app/start_vnc.sh
-
-# Run the application with VNC
-CMD ["/app/start_with_vnc.sh"]
+# Run the MCP server
+CMD ["uvicorn", "mcp.server:app", "--host", "0.0.0.0", "--port", "10000"]
