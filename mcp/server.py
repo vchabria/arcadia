@@ -359,6 +359,10 @@ async def create_arcadia_order_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     Thin wrapper - delegates to core.create_single_arcadia_order()
     """
     try:
+        # FIX: Ensure master_bill_number is a string before validation
+        if "master_bill_number" in args:
+            args["master_bill_number"] = str(args["master_bill_number"])
+        
         # Parse and validate input using Pydantic schema
         order_input = CreateOrderInput(**args)
         

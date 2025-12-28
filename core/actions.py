@@ -30,84 +30,27 @@ from .errors import (
 
 def extract_orders_from_gmail() -> ExtractionResult:
     """
-    Extract inbound order data from Gmail by running extraction script
+    Extract inbound order data from Gmail
+    
+    NOTE: This functionality is currently disabled on Render because it relied on
+    external scripts in the stagehand-test folder which are not deployed.
     
     Returns:
-        ExtractionResult with email_subject and orders array
+        ExtractionResult with placeholder data
     
     Raises:
-        ExtractionError: If extraction fails
-        AutomationTimeoutError: If script times out
+        ExtractionError: Always raises - feature not implemented
     """
     print("=" * 80)
-    print("📧 EXTRACTING INBOUND ORDER DATA FROM GMAIL")
+    print("📧 GMAIL EXTRACTION")
     print("=" * 80)
-    print("🔄 Running extraction via subprocess (avoids async conflicts)...\n")
+    print("⚠️  Gmail extraction is not currently available on Render.\n")
+    print("   This feature required external scripts that are not included in deployment.")
+    print("   Please use the 'create_arcadia_order' tool directly for now.\n")
     
-    # Path to the working script (relative to this file)
-    script_path = Path(__file__).parent.parent.parent / "stagehand-test" / "extraction_only.py"
-    
-    # Fallback to full script if extraction-only doesn't exist
-    if not script_path.exists():
-        script_path = Path(__file__).parent.parent.parent / "stagehand-test" / "add_inventory_from_tonya_email.py"
-    
-    if not script_path.exists():
-        raise ExtractionError(f"Extraction script not found: {script_path}")
-    
-    try:
-        # Prepare environment with API key
-        env = os.environ.copy()
-        api_key = os.getenv('NOVA_ACT_API_KEY')
-        
-        if not api_key:
-            print("   ⚠️  WARNING: NOVA_ACT_API_KEY not set - extraction may fail")
-        else:
-            env['NOVA_ACT_API_KEY'] = api_key
-        
-        print(f"   Script: {script_path}")
-        print(f"   API Key: {'Set ✅' if api_key else 'Not Set ❌'}\n")
-        
-        # Determine Python command
-        python_cmd = _get_python_command()
-        
-        # Run the script as subprocess
-        result = subprocess.run(
-            [python_cmd, str(script_path)],
-            capture_output=True,
-            text=True,
-            env=env,
-            timeout=300,  # 5 minute timeout
-            cwd=script_path.parent
-        )
-        
-        if result.returncode != 0:
-            error_msg = result.stderr or result.stdout or f'Script failed with exit code {result.returncode}'
-            print(f"\n❌ Script failed: {error_msg}")
-            raise ScriptExecutionError(
-                f"Extraction script failed: {error_msg}",
-                exit_code=result.returncode,
-                stderr=result.stderr
-            )
-        
-        print(f"\n✅ Extraction completed successfully")
-        
-        # TODO: Parse actual JSON output from script
-        # For now, return a placeholder response
-        return ExtractionResult(
-            status="success",
-            email_subject="Extracted from subprocess",
-            orders_count=0,
-            orders=[]
-        )
-        
-    except subprocess.TimeoutExpired:
-        print("\n❌ Script timed out after 5 minutes")
-        raise AutomationTimeoutError("Extraction script timed out", timeout_seconds=300)
-    except (ExtractionError, AutomationTimeoutError, ScriptExecutionError):
-        raise
-    except Exception as e:
-        print(f"\n❌ Unexpected error during extraction: {e}")
-        raise ExtractionError(f"Extraction failed: {str(e)}") from e
+    raise ExtractionError(
+        "Gmail extraction is not available. Use 'create_arcadia_order' tool to create orders directly."
+    )
 
 
 def submit_orders_to_arcadia(email_data: EmailExtractionData) -> SubmissionResult:
@@ -225,8 +168,8 @@ def create_single_arcadia_order(order_input: CreateOrderInput) -> OrderResult:
     if not script_path.exists():
         raise ScriptExecutionError(f"Arcadia script not found: {script_path}")
     
-    # Extract parameters
-    master_bill = order_input.master_bill_number
+    # Extract parameters and ensure master_bill is string
+    master_bill = str(order_input.master_bill_number)
     product_code = order_input.product_code
     quantity = order_input.quantity
     temperature = order_input.temperature
