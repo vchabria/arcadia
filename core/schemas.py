@@ -106,6 +106,7 @@ class OrderResult(BaseModel):
     confirmation_id: Optional[str] = Field(None, description="Arcadia confirmation ID (on success)")
     error: Optional[str] = Field(None, description="Error message (on failure)")
     message: Optional[str] = Field(None, description="Human-readable status message")
+    video_path: Optional[str] = Field(None, description="Path to recorded video of browser session (if available)")
 
 
 class ExtractionResult(BaseModel):

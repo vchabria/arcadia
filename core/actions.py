@@ -277,6 +277,21 @@ def create_single_arcadia_order(order_input: CreateOrderInput) -> OrderResult:
             cwd=script_path.parent
         )
         
+        # Parse JSON output from script to extract video_path
+        video_path = None
+        try:
+            # Look for JSON output in stdout
+            import json
+            import re
+            json_match = re.search(r'\{[\s\S]*"success"[\s\S]*\}', result.stdout)
+            if json_match:
+                script_result = json.loads(json_match.group())
+                video_path = script_result.get('video_path')
+                if video_path:
+                    print(f"\n🎥 Video recorded: {video_path}")
+        except Exception as e:
+            print(f"⚠️  Could not parse video path from output: {e}")
+        
         if result.returncode != 0:
             error_msg = result.stderr or result.stdout or f'Script failed with exit code {result.returncode}'
             print(f"\n❌ Script failed: {error_msg}")
@@ -286,7 +301,8 @@ def create_single_arcadia_order(order_input: CreateOrderInput) -> OrderResult:
                 product_code=product_code,
                 quantity=quantity,
                 temperature=temperature,
-                error=error_msg
+                error=error_msg,
+                video_path=video_path
             )
         
         print(f"\n✅ Order created successfully")
@@ -298,17 +314,32 @@ def create_single_arcadia_order(order_input: CreateOrderInput) -> OrderResult:
             quantity=quantity,
             temperature=temperature,
             confirmation_id=f'ORD-{master_bill}',
-            message='Order created successfully in Arcadia'
+            message='Order created successfully in Arcadia',
+            video_path=video_path
         )
         
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as e:
         print("\n❌ Script timed out after 5 minutes")
+        # Try to get video_path even on timeout
+        video_path = None
+        try:
+            import json
+            import re
+            if hasattr(e, 'stdout') and e.stdout:
+                json_match = re.search(r'\{[\s\S]*"video_path"[\s\S]*\}', e.stdout)
+                if json_match:
+                    script_result = json.loads(json_match.group())
+                    video_path = script_result.get('video_path')
+        except:
+            pass
+        
         return OrderResult(
             status="failed",
             master_bill_number=master_bill,
             product_code=product_code,
             quantity=quantity,
-            error='Script timed out after 5 minutes'
+            error='Script timed out after 5 minutes',
+            video_path=video_path
         )
     except Exception as e:
         print(f"\n❌ Error: {e}")
