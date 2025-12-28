@@ -72,10 +72,14 @@ app.add_middleware(
 async def authenticate_mcp_requests(request: Request, call_next):
     """
     Validate MCP requests with Bearer token
-    Skips auth for /health endpoint
+    Skips auth for /health endpoint and VNC paths
     """
-    # Skip authentication for health checks
+    # Skip authentication for health checks and VNC
     if request.url.path == "/health":
+        return await call_next(request)
+    
+    # Skip authentication for VNC/websockify paths
+    if request.url.path.startswith("/vnc") or request.url.path.startswith("/websockify"):
         return await call_next(request)
     
     # Get MCP secret from environment

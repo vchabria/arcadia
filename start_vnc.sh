@@ -19,8 +19,11 @@ x11vnc -display :99 -nopw -forever -shared &
 sleep 1
 
 echo "🌐 Starting noVNC web interface..."
-# noVNC (browser-based)
-websockify --web=/usr/share/novnc/ 6080 localhost:5900 &
+# noVNC (browser-based) - safer config with fallback paths
+websockify \
+  --web=/usr/share/novnc \
+  --wrap-mode=ignore \
+  6080 localhost:5900 &
 
 echo "✅ VNC listening on :6080"
 
