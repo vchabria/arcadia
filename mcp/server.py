@@ -72,14 +72,12 @@ app.add_middleware(
 async def authenticate_mcp_requests(request: Request, call_next):
     """
     Validate MCP requests with Bearer token
-    Skips auth for /health endpoint and VNC paths
-    """
-    # Skip authentication for health checks and VNC
-    if request.url.path == "/health":
-        return await call_next(request)
+    Skips auth for /health endpoint only
     
-    # Skip authentication for VNC/websockify paths
-    if request.url.path.startswith("/vnc") or request.url.path.startswith("/websockify"):
+    Note: VNC runs on separate port 6080, not through FastAPI
+    """
+    # Skip authentication for health checks
+    if request.url.path == "/health":
         return await call_next(request)
     
     # Get MCP secret from environment
