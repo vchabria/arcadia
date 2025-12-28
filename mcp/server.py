@@ -71,7 +71,7 @@ app.add_middleware(
 @app.middleware("http")
 async def authenticate_mcp_requests(request: Request, call_next):
     """
-    Validate MCP requests with x-mcp-key header
+    Validate MCP requests with Bearer token
     Skips auth for /health endpoint
     """
     # Skip authentication for health checks
@@ -86,13 +86,21 @@ async def authenticate_mcp_requests(request: Request, call_next):
         print("[WARNING] MCP_SECRET not set - authentication disabled!")
         return await call_next(request)
     
-    # Validate x-mcp-key header
-    provided_key = request.headers.get("x-mcp-key")
+    # Validate Authorization Bearer token
+    auth = request.headers.get("authorization")
     
-    if not provided_key or provided_key != mcp_secret:
+    if not auth or not auth.lower().startswith("bearer "):
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            content={"error": "Unauthorized", "message": "Invalid or missing x-mcp-key header"}
+            content={"error": "Unauthorized", "message": "Missing Bearer token"}
+        )
+    
+    token = auth.split(" ", 1)[1].strip()
+    
+    if token != mcp_secret:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"error": "Unauthorized", "message": "Invalid Bearer token"}
         )
     
     return await call_next(request)
