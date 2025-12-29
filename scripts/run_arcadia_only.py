@@ -408,23 +408,66 @@ def run_arcadia_order(master_bill, product_code, quantity, temperature="FREEZER"
             print(f"❌ Failed to click Submit: {e}\n")
             raise
         
-        # Wait for confirmation message
+        # Wait for confirmation message - MANDATORY CHECK
         print("→ Waiting for order confirmation...")
         try:
-            nova.act("Look for a success message, confirmation message, or text saying the order was processed or created successfully", max_steps=8)
+            nova.act("""
+                Look for the confirmation message that says 'Inbound Order Confirmed' or similar success message.
+                This is CRITICAL - we need to verify the order was actually created.
+                Look for text containing: 'confirmed', 'created successfully', or 'order processed'
+            """, max_steps=10)
             print("✅ Order confirmation detected!\n")
             time.sleep(2)
+            
+            # Take screenshot of confirmation
+            print("📸 Taking screenshot of confirmation...")
+            try:
+                from datetime import datetime
+                from pathlib import Path
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                
+                if Path("/app").exists():
+                    screenshot_path = f"/tmp/order_confirmed_{timestamp}_{master_bill}.png"
+                else:
+                    screenshot_path = f"./order_confirmed_{timestamp}_{master_bill}.png"
+                
+                nova.page.screenshot(path=screenshot_path, full_page=True)
+                print(f"✅ Confirmation screenshot saved: {screenshot_path}")
+                print(f"   This shows the order was successfully processed\n")
+            except Exception as screenshot_error:
+                print(f"⚠️  Could not take confirmation screenshot: {screenshot_error}\n")
+            
+            print("="*70)
+            print("🎉 ORDER SUCCESSFULLY CREATED IN ARCADIA!")
+            print("="*70)
+            print()
+            
+            success = True
+            error_msg = None
+            
         except Exception as e:
-            print(f"⚠️  Could not detect confirmation message: {e}")
-            print("   (Order may still have been created)\n")
-        
-        print("="*70)
-        print("🎉 ORDER SUCCESSFULLY CREATED IN ARCADIA!")
-        print("="*70)
-        print()
-        
-        success = True
-        error_msg = None
+            print(f"❌ CRITICAL: Could not detect confirmation message: {e}")
+            print("   Order submission may have failed!")
+            print("   Taking screenshot of current state...\n")
+            
+            # Take screenshot of failure state
+            try:
+                from datetime import datetime
+                from pathlib import Path
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                
+                if Path("/app").exists():
+                    screenshot_path = f"/tmp/order_failed_{timestamp}_{master_bill}.png"
+                else:
+                    screenshot_path = f"./order_failed_{timestamp}_{master_bill}.png"
+                
+                nova.page.screenshot(path=screenshot_path, full_page=True)
+                print(f"📸 Failure screenshot saved: {screenshot_path}\n")
+            except:
+                pass
+            
+            # FAIL THE WHOLE OPERATION
+            raise Exception(f"Order confirmation not found. Submission likely failed: {e}")
         
     except Exception as e:
         print(f"\n❌ Error: {e}\n")

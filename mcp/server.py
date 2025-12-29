@@ -540,7 +540,7 @@ async def handle_mcp_request(body: dict) -> dict:
 @app.get("/screenshots")
 async def list_screenshots():
     """
-    List all available screenshots (login success, login failed, and pre-submit forms).
+    List all available screenshots (login, forms, confirmations, and failures).
     
     Returns a list of screenshot filenames sorted by timestamp (newest first).
     """
@@ -552,8 +552,10 @@ async def list_screenshots():
         login_success = glob.glob(f"{screenshot_dir}/login_success_*.png")
         login_failed = glob.glob(f"{screenshot_dir}/login_failed_*.png")
         forms_filled = glob.glob(f"{screenshot_dir}/form_filled_*.png")
+        order_confirmed = glob.glob(f"{screenshot_dir}/order_confirmed_*.png")
+        order_failed = glob.glob(f"{screenshot_dir}/order_failed_*.png")
         
-        all_screenshots = login_success + login_failed + forms_filled
+        all_screenshots = login_success + login_failed + forms_filled + order_confirmed + order_failed
         all_screenshots.sort(reverse=True)  # Most recent first
         
         # Extract just the filenames
@@ -566,10 +568,12 @@ async def list_screenshots():
             "by_type": {
                 "login_success": [Path(s).name for s in sorted(login_success, reverse=True)],
                 "login_failed": [Path(s).name for s in sorted(login_failed, reverse=True)],
-                "forms_filled": [Path(s).name for s in sorted(forms_filled, reverse=True)]
+                "forms_filled": [Path(s).name for s in sorted(forms_filled, reverse=True)],
+                "order_confirmed": [Path(s).name for s in sorted(order_confirmed, reverse=True)],
+                "order_failed": [Path(s).name for s in sorted(order_failed, reverse=True)]
             },
             "directory": screenshot_dir,
-            "note": "Screenshots show login attempts and completed order forms before submission"
+            "note": "Screenshots show login attempts, filled forms, confirmed orders, and failures"
         }
     except Exception as e:
         raise HTTPException(
@@ -587,6 +591,8 @@ async def get_screenshot(filename: str):
     - login_success_YYYYMMDD_HHMMSS.png
     - login_failed_YYYYMMDD_HHMMSS.png
     - form_filled_YYYYMMDD_HHMMSS_MASTERBILL.png
+    - order_confirmed_YYYYMMDD_HHMMSS_MASTERBILL.png
+    - order_failed_YYYYMMDD_HHMMSS_MASTERBILL.png
     
     Args:
         filename: Name of the screenshot file
@@ -596,11 +602,11 @@ async def get_screenshot(filename: str):
     """
     try:
         # Security: Only allow specific patterns to prevent directory traversal
-        valid_prefixes = ["login_success_", "login_failed_", "form_filled_"]
+        valid_prefixes = ["login_success_", "login_failed_", "form_filled_", "order_confirmed_", "order_failed_"]
         if not any(filename.startswith(prefix) for prefix in valid_prefixes) or not filename.endswith(".png"):
             raise HTTPException(
                 status_code=400,
-                detail="Invalid filename format. Expected: login_success_*.png, login_failed_*.png, or form_filled_*.png"
+                detail="Invalid filename format. Expected: login_*, form_filled_*, order_confirmed_*, or order_failed_*.png"
             )
         
         # Determine screenshot directory
@@ -640,7 +646,9 @@ async def get_latest_screenshot():
         patterns = [
             f"{screenshot_dir}/login_success_*.png",
             f"{screenshot_dir}/login_failed_*.png",
-            f"{screenshot_dir}/form_filled_*.png"
+            f"{screenshot_dir}/form_filled_*.png",
+            f"{screenshot_dir}/order_confirmed_*.png",
+            f"{screenshot_dir}/order_failed_*.png"
         ]
         
         all_screenshots = []
@@ -734,6 +742,72 @@ async def get_latest_form_screenshot():
         raise HTTPException(
             status_code=500,
             detail=f"Failed to retrieve latest form screenshot: {str(e)}"
+        )
+
+
+@app.get("/screenshots/latest/confirmation")
+async def get_latest_confirmation_screenshot():
+    """
+    Download the most recent order confirmation screenshot.
+    Shows proof that the order was successfully created.
+    """
+    try:
+        screenshot_dir = "/tmp" if Path("/app").exists() else "."
+        confirm_screenshots = glob.glob(f"{screenshot_dir}/order_confirmed_*.png")
+        
+        if not confirm_screenshots:
+            raise HTTPException(
+                status_code=404,
+                detail="No confirmation screenshots found. No confirmed orders yet."
+            )
+        
+        confirm_screenshots.sort(reverse=True)
+        latest = Path(confirm_screenshots[0])
+        
+        return FileResponse(
+            path=str(latest),
+            media_type="image/png",
+            filename=latest.name
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve confirmation screenshot: {str(e)}"
+        )
+
+
+@app.get("/screenshots/latest/failure")
+async def get_latest_failure_screenshot():
+    """
+    Download the most recent order failure screenshot.
+    Shows the state when an order submission failed.
+    """
+    try:
+        screenshot_dir = "/tmp" if Path("/app").exists() else "."
+        failed_screenshots = glob.glob(f"{screenshot_dir}/order_failed_*.png")
+        
+        if not failed_screenshots:
+            raise HTTPException(
+                status_code=404,
+                detail="No failure screenshots found. (Good news - no failures!)"
+            )
+        
+        failed_screenshots.sort(reverse=True)
+        latest = Path(failed_screenshots[0])
+        
+        return FileResponse(
+            path=str(latest),
+            media_type="image/png",
+            filename=latest.name
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve failure screenshot: {str(e)}"
         )
 
 
